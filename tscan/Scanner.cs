@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using System.Drawing;
+using System.ComponentModel.Design;
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Tscan
 {
@@ -13,6 +17,61 @@ namespace Tscan
     {
         [DllImport("IPHLPAPI.DLL", ExactSpelling = true)]
         public static extern int SendARP(uint DestIP, uint SrcIP, byte[] pMacAddr, ref uint PhyAddrLen);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern int RegConnectRegistry(string lpmachineName, int hKey, ref IntPtr phKResult);
+        [DllImport("advapi32.dll", EntryPoint = "RegEnumKeyEx")]
+        extern private static int RegEnumKeyEx(IntPtr hkey,
+            uint index,
+            StringBuilder lpName,
+            ref uint lpcbName,
+            IntPtr reserved,
+            IntPtr lpClass,
+            IntPtr lpcbClass,
+            out long lpftLastWriteTime);
+        [DllImport("advapi32.dll", CharSet = CharSet.Auto)]
+        public static extern int RegOpenKeyEx(
+          IntPtr hKey,
+          string subKey,
+          int ulOptions,
+          int samDesired,
+          out IntPtr hkResult);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern uint RegQueryValueEx(
+            IntPtr hKey,
+            string lpValueName,
+            int lpReserved,
+            ref RegistryValueKind lpType,
+            IntPtr lpData,
+            ref int lpcbData);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern uint RegQueryValueEx(
+            IntPtr hKey,
+            string lpValueName,
+            int lpReserved,
+            ref RegistryValueKind lpType,
+            StringBuilder lpData,
+            ref int lpcbData);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern uint RegQueryValueEx(
+            IntPtr hKey,
+            string lpValueName,
+            int lpReserved,
+            ref RegistryValueKind lpType,
+            Byte[] lpData,
+            ref int lpcbData);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern uint RegEnumValue(
+          IntPtr hKey,
+          uint dwIndex,
+          StringBuilder lpValueName,
+          ref uint lpcValueName,
+          IntPtr lpReserved,
+          IntPtr lpType,
+          IntPtr lpData,
+          IntPtr lpcbData);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        public static extern int RegCloseKey(
+            IntPtr hKey);
 
         public int IntScanType;
         public Boolean ADOnly;
@@ -59,6 +118,238 @@ namespace Tscan
             //rapid7 several are 1/10k
         }
         /// <summary>
+        /// This gets a list of names of values using advapi.dll
+        /// </summary>
+        /// 
+        public List<String> GetValueNames(IntPtr hKey)
+        {
+            List<String> sc = new List<String>();
+            try
+            {
+                uint i = 0;
+                uint ret;
+                uint NameSize;
+                StringBuilder sb = new StringBuilder(1024);
+                //String[] ans = new String[1];
+
+                // quick sanity check
+                if (hKey.Equals(IntPtr.Zero))
+                {
+                    return sc;
+                    //throw new ApplicationException("Cannot access a closed registry key");
+                }
+
+                while (true)
+                {
+                    NameSize = 1024;
+                    try
+                    {
+                        ret = RegEnumValue(hKey, i, sb, ref NameSize, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                    }
+                    catch 
+                    { 
+                        return sc; 
+                    }
+                    if (ret != 0) return sc;
+                    sc.Add(sb.ToString());
+                    i++;
+                }
+            }
+            catch 
+            { 
+                return sc; 
+            }
+        }
+        /// <summary>
+        /// This opens a key using advapi.dll
+        /// </summary>
+        /// 
+        public IntPtr RegOpenKey(IntPtr rootKey, string keyPath)
+        {
+            IntPtr hKey = IntPtr.Zero;
+            if (RegOpenKeyEx(rootKey, keyPath, 0, 131097, out hKey) == 0)
+            {
+                return hKey;
+            }
+            return IntPtr.Zero;
+        }
+        /// <summary>
+        /// This gets a value belonging to a name using advapi.dll
+        /// </summary>
+        /// 
+        private String RegQueryValue(IntPtr hKey, string valueName)
+        {
+            int size = 1024;
+            string keyValue = null;
+            Byte[] bytes = null;
+            IntPtr Tester = IntPtr.Zero;
+            StringBuilder keyBuffer = new StringBuilder(1024);
+            RegistryValueKind type = RegistryValueKind.String;
+            //StringBuilder keyBuffer = new StringBuilder((int)size);
+            if (RegQueryValueEx(hKey, valueName, 0, ref type, Tester, ref size) == 0)
+            {
+                if (type == RegistryValueKind.String || type == RegistryValueKind.ExpandString)
+                {
+                    keyBuffer = new StringBuilder(size);
+                    RegQueryValueEx(hKey, valueName, 0, ref type, keyBuffer, ref size);
+                    keyValue = type.ToString() + 
+                        "\",\"" + ScrubString(keyBuffer.ToString());
+                }
+                else if(type == RegistryValueKind.DWord)
+                {
+                    bytes = new Byte[size];
+                    RegQueryValueEx(hKey, valueName, 0, ref type, bytes, ref size);
+                    if (bytes != null && size == 4) keyValue = type.ToString() + 
+                            "\",\"" + ScrubString(BitConverter.ToUInt32(bytes, size).ToString());
+                }
+            }
+            try
+            {
+                //RegCloseKey(hKey);
+            }
+            catch { }
+
+            return (keyValue);
+        }
+        /// <summary>
+        /// This lists keys using advapi.dll
+        /// </summary>
+        /// 
+        public List<String> RegEnumKey(IntPtr hKey)
+        {
+            int ret = 0;
+            uint NameSize = 0;
+            uint i = 0;
+            List<String> Keys = new List<string>();
+            StringBuilder sb = new StringBuilder(256);
+            long Out;
+            while (true)
+            {
+                NameSize = 255 + 1;
+                try
+                {
+                    ret = RegEnumKeyEx(hKey, i, sb, ref NameSize, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out Out);
+                }
+                catch 
+                {
+                    return Keys;
+                }
+                if (ret != 0) return Keys;
+                else Keys.Add(sb.ToString());
+                i++;
+            }
+            ;
+        }
+        /// <summary>
+        /// This connects to remote reg using advapi.dll
+        /// </summary>
+        /// 
+        public IntPtr ConnectToRemoteReg(String Server, int HKEY, ref bool bOK)
+        {
+            int iReturn = 0;
+            IntPtr iResult = IntPtr.Zero;
+            int HKLM = unchecked((int)0x80000002);
+            if (HKEY == null) HKEY = HKLM;
+
+            iReturn = RegConnectRegistry(@"\\" + Server, HKEY, ref iResult);
+
+            if (iReturn == 0)
+            {
+                bOK = true;
+                return iResult;
+            }
+            else
+            {
+                bOK = false;
+            }
+
+            return IntPtr.Zero;
+        }
+        /// <summary>
+        /// This connects a remote registry key.
+        /// </summary>
+        /// 
+        public IntPtr ConnectToRemoteReg(String Server, RegistryHive Hive, String Key)
+        {
+            bool Success = false;
+            IntPtr hRef = IntPtr.Zero;
+            int HKEY = unchecked((int)0x80000002);
+            String Table = "";
+            if (Hive == RegistryHive.LocalMachine) HKEY = unchecked((int)0x80000002);
+            hRef = ConnectToRemoteReg(Server, HKEY, ref Success);
+            if (!Success) return IntPtr.Zero;
+            hRef = RegOpenKey(hRef, Key);
+            return hRef;
+        }
+        /// <summary>
+        /// This dumps a remote registry key.
+        /// </summary>
+        /// 
+        public Boolean RegistryDumpAdvapi(String Server, RegistryHive Hive, String Key, System.Collections.Concurrent.ConcurrentDictionary<String, String> Output)
+        {
+            IntPtr hRef = IntPtr.Zero;
+            hRef = ConnectToRemoteReg(Server, Hive, Key);
+            String StringTable = RegistryDumpAdvapi(Server, Hive, hRef, Key);
+            if (String.IsNullOrEmpty(StringTable)) return false;
+            if (Output.ContainsKey("RegistryAdvapi"))
+            {
+                Output["RegistryAdvapi"] += StringTable;
+            }
+            else
+            {
+                Output.TryAdd("RegistryAdvapi", StringTable);
+            }
+
+            return true;
+        }
+        /// <summary>
+        /// This dumps registry keys and their subkeys, names, and values recursively.
+        /// </summary>
+        /// 
+        public String RegistryDumpAdvapi(String Server, RegistryHive Hive, IntPtr Key, String KeyString)
+        {
+            String Table = "";
+            if (Key == null) return Table;
+            foreach (String KeyName in RegEnumKey(Key))
+            {
+                Thread.Sleep(1);
+                if (!String.IsNullOrEmpty(KeyName))
+                    Table += RegistryDumpAdvapi(Server, Hive, ConnectToRemoteReg(Server, Hive, KeyString + "\\" + KeyName), KeyString + "\\" + KeyName);
+            }
+            foreach (String ValueName in GetValueNames(Key))
+            {
+                Thread.Sleep(1);
+                ValueName.ToString();
+                if (true)//Key.GetValueKind(ValueName) == RegistryValueKind.String)
+                {
+                    try
+                    {
+                        String Value = RegQueryValue(Key, ValueName);
+                        String Row = Server + ",\"" +
+                            ScrubString(KeyString) + "\",\"" +
+                            ScrubString(ValueName) + "\",\"" +
+                            Value + "\"" + Environment.NewLine;
+                        Table += Row;
+                    }
+                    catch 
+                    {
+                        try
+                        {
+                            String Value = RegQueryValue(Key, ValueName);
+                            String Row = Server + ",\"" +
+                                ScrubString(KeyString) + "\",\"" +
+                                ScrubString(ValueName) + "\",\"" +
+                                ScrubString(Value) + "\"" + Environment.NewLine;
+                            Table += Row;
+                        }
+                        catch { }
+                    }
+                }
+            }
+            ;
+            return Table;
+        }
+        /// <summary>
         /// This dumps a remote registry key.
         /// </summary>
         /// 
@@ -85,11 +376,12 @@ namespace Tscan
         {
             String Table = "";
             if (Key == null) return Table;
-            foreach(String KeyName in Key.GetSubKeyNames()) 
+            foreach (String KeyName in Key.GetSubKeyNames())
             {
                 if (!String.IsNullOrEmpty(KeyName))
                     Table += RegistryDump(Server, Key.OpenSubKey(KeyName));
-            };
+            }
+            ;
             foreach (String ValueName in Key.GetValueNames())
             {
                 ValueName.ToString();
@@ -113,13 +405,14 @@ namespace Tscan
                     Key.GetValueKind(ValueName) == RegistryValueKind.QWord)
                 {
                     String Value = Key.GetValue(ValueName).ToString();
-                    String Row = Server + ",\"" + 
-                        ScrubString(Key.Name) + "\",\"" + 
-                        ScrubString(ValueName) + "\",\"" + 
+                    String Row = Server + ",\"" +
+                        ScrubString(Key.Name) + "\",\"" +
+                        ScrubString(ValueName) + "\",\"" +
                         ScrubString(Value) + "\"" + Environment.NewLine;
                     Table += Row;
                 }
-            };
+            }
+            ;
             return Table;
         }
         /// <summary>
@@ -653,15 +946,9 @@ namespace Tscan
         /// 
         public String ScrubString(String String)
         {
-            String Stripper = "\'\"\\\n\0\xe\x1\x7F\a\b\f\r\t\v,";
-            for (uint i = 0; i < 32; i++)
-            {
-                Stripper += (char)i;
-            }
-            foreach (Char Strip in Stripper.ToCharArray()) 
-            {
-                String = String.Replace(Strip.ToString(), "");
-            };
+            if (String.IsNullOrEmpty(String)) String = "";
+            String Stripper = "[\'\"\\\n\0\xe\x1\x7F\a\b\f\r\t\v,]";
+            String = Regex.Replace(String, Stripper, "");
             return String;
         }
         /// <summary>
@@ -1103,12 +1390,22 @@ namespace Tscan
             else Success = false;
             if (HTTPHeaderScan(Server, Output) && Success) Success = true;
             else Success = false;
-            if (RegistryDump(Server, 
-                RegistryHive.LocalMachine, 
-                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", 
+            if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
                 Output) && Success) Success = true;
             else Success = false;
             if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
+                Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDumpAdvapi(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+                Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
                 Output) && Success) Success = true;
