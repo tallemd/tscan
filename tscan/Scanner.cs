@@ -188,19 +188,19 @@ namespace Tscan
             //StringBuilder keyBuffer = new StringBuilder((int)size);
             if (RegQueryValueEx(hKey, valueName, 0, ref type, Tester, ref size) == 0)
             {
+                keyValue = type.ToString() + "\",\"";
                 if (type == RegistryValueKind.String || type == RegistryValueKind.ExpandString)
                 {
                     keyBuffer = new StringBuilder(size);
                     RegQueryValueEx(hKey, valueName, 0, ref type, keyBuffer, ref size);
-                    keyValue = type.ToString() + 
-                        "\",\"" + ScrubString(keyBuffer.ToString());
+                    keyValue += ScrubString(keyBuffer.ToString());
                 }
-                else if(type == RegistryValueKind.DWord)
+                else if(type == RegistryValueKind.DWord || type == RegistryValueKind.QWord)
                 {
                     bytes = new Byte[size];
                     RegQueryValueEx(hKey, valueName, 0, ref type, bytes, ref size);
-                    if (bytes != null && size == 4) keyValue = type.ToString() + 
-                            "\",\"" + ScrubString(BitConverter.ToUInt32(bytes, size).ToString());
+                    if (bytes != null && size == 4) keyValue += ScrubString(BitConverter.ToUInt32(bytes, 0).ToString());
+                    else if (bytes != null && size == 8) keyValue += ScrubString(BitConverter.ToUInt64(bytes, 0).ToString());
                 }
             }
             try
@@ -395,6 +395,7 @@ namespace Tscan
                     String Row = Server + ",\"" +
                         ScrubString(Key.Name) + "\",\"" +
                         ScrubString(ValueName) + "\",\"" +
+                        Key.GetValueKind(ValueName) + "\",\"" +
                         ScrubString(Values) + "\"" + Environment.NewLine;
                     Table += Row;
                 }
@@ -408,7 +409,17 @@ namespace Tscan
                     String Row = Server + ",\"" +
                         ScrubString(Key.Name) + "\",\"" +
                         ScrubString(ValueName) + "\",\"" +
+                        Key.GetValueKind(ValueName) + "\",\"" + 
                         ScrubString(Value) + "\"" + Environment.NewLine;
+                    Table += Row;
+                }
+                else
+                {
+                    String Row = Server + ",\"" +
+                        ScrubString(Key.Name) + "\",\"" +
+                        ScrubString(ValueName) + "\",\"" +
+                        Key.GetValueKind(ValueName) + "\",\"" +
+                        "" + "\"" + Environment.NewLine;
                     Table += Row;
                 }
             }
@@ -947,7 +958,12 @@ namespace Tscan
         public String ScrubString(String String)
         {
             if (String.IsNullOrEmpty(String)) String = "";
-            String Stripper = "[\'\"\\\n\0\xe\x1\x7F\a\b\f\r\t\v,]";
+            String Stripper = "[\'\"\\\n\0\xe\x1\x7F\a\b\f\r\t\v,";
+            for (uint i = 0; i < 32; i++)
+            {
+                Stripper += (char)i;
+            }
+            Stripper += "]";
             String = Regex.Replace(String, Stripper, "");
             return String;
         }
