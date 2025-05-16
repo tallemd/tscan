@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace Tscan
 {
@@ -56,6 +57,70 @@ namespace Tscan
                 "Administrator", "user1", "admin", "demo", "db2admin", "Admin", "sql"};
             WMIUsernames = WMIUsernamesTemp;
             //rapid7 several are 1/10k
+        }
+        /// <summary>
+        /// This dumps a remote registry key.
+        /// </summary>
+        /// 
+        public Boolean RegistryDump(String Server, RegistryHive Hive, String Key, System.Collections.Concurrent.ConcurrentDictionary<String, String> Output)
+        {
+            String StringTable = RegistryDump(Server, RegistryKey.OpenRemoteBaseKey(Hive, Server).OpenSubKey(Key));
+            if (String.IsNullOrEmpty(StringTable)) return false;
+            if (Output.ContainsKey("Registry"))
+            {
+                Output["Registry"] += StringTable;
+            }
+            else
+            {
+                Output.TryAdd("Registry", StringTable);
+            }
+
+            return true;
+        }
+        /// <summary>
+        /// This dumps registry keys and their subkeys, names, and values recursively.
+        /// </summary>
+        /// 
+        public String RegistryDump(String Server, RegistryKey Key)
+        {
+            String Table = "";
+            if (Key == null) return Table;
+            foreach(String KeyName in Key.GetSubKeyNames()) 
+            {
+                if (!String.IsNullOrEmpty(KeyName))
+                    Table += RegistryDump(Server, Key.OpenSubKey(KeyName));
+            };
+            foreach (String ValueName in Key.GetValueNames())
+            {
+                ValueName.ToString();
+                if (Key.GetValueKind(ValueName) == RegistryValueKind.MultiString)
+                {
+                    String Values = "";
+                    foreach (String Value in (String[])Key.GetValue(ValueName))
+                    {
+                        Values += ScrubString(Value) + " ";
+                    }
+                    String Row = Server + ",\"" +
+                        ScrubString(Key.Name) + "\",\"" +
+                        ScrubString(ValueName) + "\",\"" +
+                        ScrubString(Values) + "\"" + Environment.NewLine;
+                    Table += Row;
+                }
+                else if (Key.GetValueKind(ValueName) == RegistryValueKind.String ||
+                    Key.GetValueKind(ValueName) == RegistryValueKind.DWord ||
+                    Key.GetValueKind(ValueName) == RegistryValueKind.Binary ||
+                    Key.GetValueKind(ValueName) == RegistryValueKind.ExpandString ||
+                    Key.GetValueKind(ValueName) == RegistryValueKind.QWord)
+                {
+                    String Value = Key.GetValue(ValueName).ToString();
+                    String Row = Server + ",\"" + 
+                        ScrubString(Key.Name) + "\",\"" + 
+                        ScrubString(ValueName) + "\",\"" + 
+                        ScrubString(Value) + "\"" + Environment.NewLine;
+                    Table += Row;
+                }
+            };
+            return Table;
         }
         /// <summary>
         /// This writes a file to disk
@@ -588,7 +653,16 @@ namespace Tscan
         /// 
         public String ScrubString(String String)
         {
-            return String.Replace(Environment.NewLine, " ").Replace("\"", "").Replace(",", " ");
+            String Stripper = "\'\"\\\n\0\xe\x1\x7F\a\b\f\r\t\v,";
+            for (uint i = 0; i < 32; i++)
+            {
+                Stripper += (char)i;
+            }
+            foreach (Char Strip in Stripper.ToCharArray()) 
+            {
+                String = String.Replace(Strip.ToString(), "");
+            };
+            return String;
         }
         /// <summary>
         /// This pings a single port and determines if it's open
@@ -1024,8 +1098,20 @@ namespace Tscan
                     Output);
             }
             if (PortScan(Server, Output) && Success) Success = true;
+            else Success = false;
             if (SMBHeaderScan(Server, Output) && Success) Success = true;
+            else Success = false;
             if (HTTPHeaderScan(Server, Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDump(Server, 
+                RegistryHive.LocalMachine, 
+                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", 
+                Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
+                Output) && Success) Success = true;
             else Success = false;
             //I think port scan has only true return paths lol
             if (Success)
