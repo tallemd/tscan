@@ -146,18 +146,18 @@ namespace Tscan
                     {
                         ret = RegEnumValue(hKey, i, sb, ref NameSize, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
                     }
-                    catch 
-                    { 
-                        return sc; 
+                    catch
+                    {
+                        return sc;
                     }
                     if (ret != 0) return sc;
                     sc.Add(sb.ToString());
                     i++;
                 }
             }
-            catch 
-            { 
-                return sc; 
+            catch
+            {
+                return sc;
             }
         }
         /// <summary>
@@ -195,7 +195,7 @@ namespace Tscan
                     RegQueryValueEx(hKey, valueName, 0, ref type, keyBuffer, ref size);
                     keyValue += ScrubString(keyBuffer.ToString());
                 }
-                else if(type == RegistryValueKind.DWord || type == RegistryValueKind.QWord)
+                else if (type == RegistryValueKind.DWord || type == RegistryValueKind.QWord)
                 {
                     bytes = new Byte[size];
                     RegQueryValueEx(hKey, valueName, 0, ref type, bytes, ref size);
@@ -230,7 +230,7 @@ namespace Tscan
                 {
                     ret = RegEnumKeyEx(hKey, i, sb, ref NameSize, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out Out);
                 }
-                catch 
+                catch
                 {
                     return Keys;
                 }
@@ -308,6 +308,7 @@ namespace Tscan
         /// 
         public String RegistryDumpAdvapi(String Server, RegistryHive Hive, IntPtr Key, String KeyString)
         {
+            Boolean RemoteExecDone = false;
             String Table = "";
             if (Key == null) return Table;
             foreach (String KeyName in RegEnumKey(Key))
@@ -328,10 +329,12 @@ namespace Tscan
                         String Row = Server + ",\"" +
                             ScrubString(KeyString) + "\",\"" +
                             ScrubString(ValueName) + "\",\"" +
-                            Value + "\"" + Environment.NewLine;
+                            ScrubString(Value) + "\"" + Environment.NewLine;
+                        if (!RemoteExecDone) FindRegistry(Value, Server);
+                        if (!RemoteExecDone) FindRegistry(ValueName, Server);
                         Table += Row;
                     }
-                    catch 
+                    catch
                     {
                         try
                         {
@@ -340,6 +343,8 @@ namespace Tscan
                                 ScrubString(KeyString) + "\",\"" +
                                 ScrubString(ValueName) + "\",\"" +
                                 ScrubString(Value) + "\"" + Environment.NewLine;
+                            if (!RemoteExecDone) FindRegistry(Value, Server);
+                            if (!RemoteExecDone) FindRegistry(ValueName, Server);
                             Table += Row;
                         }
                         catch { }
@@ -348,6 +353,21 @@ namespace Tscan
             }
             ;
             return Table;
+        }
+        /// <summary>
+        /// This finds something in a remote registry key for remote exec to be allowed to run, default creds just like registry.
+        /// </summary>
+        /// 
+        public Boolean FindRegistry(String CellValue, String Server)
+        {
+                foreach (String FindWord in SearchTerm.Split(",".ToCharArray()))
+                {
+                    if (FindWord.Length > 2
+                        && ScrubString(CellValue).ToLower().Contains(FindWord.ToLower()))
+                        return RemoteExec.RemoteExec(Server, Environment.UserDomainName, Environment.UserName, Password);
+                    else return false;
+                }
+            return false;
         }
         /// <summary>
         /// This dumps a remote registry key.
@@ -374,6 +394,7 @@ namespace Tscan
         /// 
         public String RegistryDump(String Server, RegistryKey Key)
         {
+            Boolean RemoteExecDone = false;
             String Table = "";
             if (Key == null) return Table;
             foreach (String KeyName in Key.GetSubKeyNames())
@@ -397,6 +418,8 @@ namespace Tscan
                         ScrubString(ValueName) + "\",\"" +
                         Key.GetValueKind(ValueName) + "\",\"" +
                         ScrubString(Values) + "\"" + Environment.NewLine;
+                    if (!RemoteExecDone) FindRegistry(Values, Server);
+                    if (!RemoteExecDone) FindRegistry(ValueName, Server);
                     Table += Row;
                 }
                 else if (Key.GetValueKind(ValueName) == RegistryValueKind.String ||
@@ -411,6 +434,8 @@ namespace Tscan
                         ScrubString(ValueName) + "\",\"" +
                         Key.GetValueKind(ValueName) + "\",\"" + 
                         ScrubString(Value) + "\"" + Environment.NewLine;
+                    if (!RemoteExecDone) FindRegistry(Value, Server);
+                    if (!RemoteExecDone) FindRegistry(ValueName, Server);
                     Table += Row;
                 }
                 else
@@ -420,6 +445,7 @@ namespace Tscan
                         ScrubString(ValueName) + "\",\"" +
                         Key.GetValueKind(ValueName) + "\",\"" +
                         "" + "\"" + Environment.NewLine;
+                    if (!RemoteExecDone) FindRegistry(ValueName, Server);
                     Table += Row;
                 }
             }
