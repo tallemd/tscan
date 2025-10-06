@@ -188,7 +188,7 @@ namespace Tscan
             //StringBuilder keyBuffer = new StringBuilder((int)size);
             if (RegQueryValueEx(hKey, valueName, 0, ref type, Tester, ref size) == 0)
             {
-                keyValue = type.ToString() + "\",\"";
+                keyValue = ScrubString(type.ToString()) + "\",\"";
                 if (type == RegistryValueKind.String || type == RegistryValueKind.ExpandString)
                 {
                     keyBuffer = new StringBuilder(size);
@@ -329,7 +329,7 @@ namespace Tscan
                         String Row = Server + ",\"" +
                             ScrubString(KeyString) + "\",\"" +
                             ScrubString(ValueName) + "\",\"" +
-                            ScrubString(Value) + "\"" + Environment.NewLine;
+                            Value + "\"" + Environment.NewLine;
                         if (!RemoteExecDone) FindRegistry(Value, Server);
                         if (!RemoteExecDone) FindRegistry(ValueName, Server);
                         Table += Row;
@@ -342,7 +342,7 @@ namespace Tscan
                             String Row = Server + ",\"" +
                                 ScrubString(KeyString) + "\",\"" +
                                 ScrubString(ValueName) + "\",\"" +
-                                ScrubString(Value) + "\"" + Environment.NewLine;
+                                Value + "\"" + Environment.NewLine;
                             if (!RemoteExecDone) FindRegistry(Value, Server);
                             if (!RemoteExecDone) FindRegistry(ValueName, Server);
                             Table += Row;
@@ -1442,6 +1442,16 @@ namespace Tscan
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
                 Output) && Success) Success = true;
             else Success = false;
+            if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
+                Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
+                Output) && Success) Success = true;
+            else Success = false;
             if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
@@ -1450,6 +1460,16 @@ namespace Tscan
             if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
+                Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDumpAdvapi(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
+                Output) && Success) Success = true;
+            else Success = false;
+            if (RegistryDumpAdvapi(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
                 Output) && Success) Success = true;
             else Success = false;
             //I think port scan has only true return paths lol
