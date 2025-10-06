@@ -285,11 +285,11 @@ namespace Tscan
         /// This dumps a remote registry key.
         /// </summary>
         /// 
-        public Boolean RegistryDumpAdvapi(String Server, RegistryHive Hive, String Key, System.Collections.Concurrent.ConcurrentDictionary<String, String> Output)
+        public Boolean RegistryDumpAdvapi(String Server, RegistryHive Hive, String Key, System.Collections.Concurrent.ConcurrentDictionary<String, String> Output, Boolean Recursive)
         {
             IntPtr hRef = IntPtr.Zero;
             hRef = ConnectToRemoteReg(Server, Hive, Key);
-            String StringTable = RegistryDumpAdvapi(Server, Hive, hRef, Key);
+            String StringTable = RegistryDumpAdvapi(Server, Hive, hRef, Key, Recursive);
             if (String.IsNullOrEmpty(StringTable)) return false;
             if (Output.ContainsKey("RegistryAdvapi"))
             {
@@ -306,16 +306,19 @@ namespace Tscan
         /// This dumps registry keys and their subkeys, names, and values recursively.
         /// </summary>
         /// 
-        public String RegistryDumpAdvapi(String Server, RegistryHive Hive, IntPtr Key, String KeyString)
+        public String RegistryDumpAdvapi(String Server, RegistryHive Hive, IntPtr Key, String KeyString, Boolean Recursive)
         {
             Boolean RemoteExecDone = false;
             String Table = "";
             if (Key == null) return Table;
-            foreach (String KeyName in RegEnumKey(Key))
+            if (Recursive)
             {
-                Thread.Sleep(1);
-                if (!String.IsNullOrEmpty(KeyName))
-                    Table += RegistryDumpAdvapi(Server, Hive, ConnectToRemoteReg(Server, Hive, KeyString + "\\" + KeyName), KeyString + "\\" + KeyName);
+                foreach (String KeyName in RegEnumKey(Key))
+                {
+                    Thread.Sleep(1);
+                    if (!String.IsNullOrEmpty(KeyName))
+                        Table += RegistryDumpAdvapi(Server, Hive, ConnectToRemoteReg(Server, Hive, KeyString + "\\" + KeyName), KeyString + "\\" + KeyName, Recursive);
+                }
             }
             foreach (String ValueName in GetValueNames(Key))
             {
@@ -373,9 +376,9 @@ namespace Tscan
         /// This dumps a remote registry key.
         /// </summary>
         /// 
-        public Boolean RegistryDump(String Server, RegistryHive Hive, String Key, System.Collections.Concurrent.ConcurrentDictionary<String, String> Output)
+        public Boolean RegistryDump(String Server, RegistryHive Hive, String Key, System.Collections.Concurrent.ConcurrentDictionary<String, String> Output, Boolean Recursive)
         {
-            String StringTable = RegistryDump(Server, RegistryKey.OpenRemoteBaseKey(Hive, Server).OpenSubKey(Key));
+            String StringTable = RegistryDump(Server, RegistryKey.OpenRemoteBaseKey(Hive, Server).OpenSubKey(Key), Recursive);
             if (String.IsNullOrEmpty(StringTable)) return false;
             if (Output.ContainsKey("Registry"))
             {
@@ -392,17 +395,19 @@ namespace Tscan
         /// This dumps registry keys and their subkeys, names, and values recursively.
         /// </summary>
         /// 
-        public String RegistryDump(String Server, RegistryKey Key)
+        public String RegistryDump(String Server, RegistryKey Key, Boolean Recursive)
         {
             Boolean RemoteExecDone = false;
             String Table = "";
             if (Key == null) return Table;
-            foreach (String KeyName in Key.GetSubKeyNames())
+            if (Recursive)
             {
-                if (!String.IsNullOrEmpty(KeyName))
-                    Table += RegistryDump(Server, Key.OpenSubKey(KeyName));
+                foreach (String KeyName in Key.GetSubKeyNames())
+                {
+                    if (!String.IsNullOrEmpty(KeyName))
+                        Table += RegistryDump(Server, Key.OpenSubKey(KeyName), Recursive);
+                }
             }
-            ;
             foreach (String ValueName in Key.GetValueNames())
             {
                 ValueName.ToString();
@@ -1435,42 +1440,74 @@ namespace Tscan
             if (RegistryDump(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-                Output) && Success) Success = true;
+                Output,
+                true) && Success) Success = true;
             else Success = false;
             if (RegistryDump(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
-                Output) && Success) Success = true;
+                Output,
+                true) && Success) Success = true;
+            else Success = false;
+            if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                Output,
+                false) && Success) Success = true;
+            else Success = false;
+            if (RegistryDump(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion",
+                Output,
+                false) && Success) Success = true;
             else Success = false;
             if (RegistryDump(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
-                Output) && Success) Success = true;
+                Output,
+                false) && Success) Success = true;
             else Success = false;
             if (RegistryDump(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
-                Output) && Success) Success = true;
+                Output,
+                false) && Success) Success = true;
             else Success = false;
             if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-                Output) && Success) Success = true;
+                Output,
+                true) && Success) Success = true;
             else Success = false;
             if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninst‌​all",
-                Output) && Success) Success = true;
+                Output,
+                true) && Success) Success = true;
+            else Success = false;
+            if (RegistryDumpAdvapi(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                Output,
+                false) && Success) Success = true;
+            else Success = false;
+            if (RegistryDumpAdvapi(Server,
+                RegistryHive.LocalMachine,
+                "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion",
+                Output,
+                false) && Success) Success = true;
             else Success = false;
             if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
-                Output) && Success) Success = true;
+                Output,
+                false) && Success) Success = true;
             else Success = false;
             if (RegistryDumpAdvapi(Server,
                 RegistryHive.LocalMachine,
                 "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform",
-                Output) && Success) Success = true;
+                Output,
+                false) && Success) Success = true;
             else Success = false;
             //I think port scan has only true return paths lol
             if (Success)
