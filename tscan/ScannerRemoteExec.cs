@@ -5,6 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using static System.Collections.Specialized.BitVector32;
+using System.IO;
+using System.ServiceProcess;
 
 namespace Tscan
 {
@@ -623,6 +626,14 @@ namespace grantprivilege
         /// 
         private void LocalExec(String Server, String User, String Pass)
         {
+            LocalExec(Server, User, Pass, RemoteExecScript);
+        }
+        /// <summary>
+        /// This allows you to run a program on a the local system
+        /// </summary>
+        /// 
+        private void LocalExec(String Server, String User, String Pass, String Command)
+        {
             //getuserhandle other code paths so unecessary
             //    EnablePrivilege(SE_DEBUG_NAME)
             //    EnablePrivilege(SE_RESTORE_NAME);
@@ -640,7 +651,7 @@ namespace grantprivilege
                 long ACLGrantResult = grantprivilege.LsaUtility.AddRight(Environment.UserName, "SeIncreaseQuotaPrivilege");
                 IsElevated(Server);
                 String[] SplitRemoteExecScript =
-                    RemoteExecScript.Replace("\\\"", "\"").Replace("\\\\", "\\").Split(" ".ToCharArray(), 2);
+                    Command.Replace("\\\"", "\"").Replace("\\\\", "\\").Split(" ".ToCharArray(), 2);
                 System.Security.SecureString SecPass = new System.Security.SecureString();
                 foreach (char PassChar in Tscan.Scan.Password) SecPass.AppendChar(PassChar);
                 System.Diagnostics.ProcessStartInfo LocalExecStartInfo =
@@ -695,6 +706,34 @@ namespace grantprivilege
                 { } // Error swallower.  Commonly sees readtoend
             }
             //Most of these settings have little bearing on access denied error messages
+        }
+        /// <summary>
+        /// This allows you to run a program using PsExec if available in the local directory
+        /// </summary>
+        /// 
+        public bool PsExec(String Server, String Domain, String User, String Pass)
+        {
+            String Command = RemoteExecScript;
+            String[] SplitRemoteExecScript =
+                Command.Replace("\\\"", "\"").Replace("\\\\", "\\").Split(" ".ToCharArray(), 2);
+            Command = "PsExec.exe \\\\" + Server + " -u " + Domain + "\\" + User + " -p \"" + Pass + "\" -h -c -d -accepteula -nobanner \""
+                    + SplitRemoteExecScript[0] + "\" \"" + SplitRemoteExecScript[1] + "\"";
+            LocalExec(Server, User, Pass, Command);
+            return true;
+        }
+        /// <summary>
+        /// This allows you to run a program using PsExec if available in the local directory
+        /// </summary>
+        /// 
+        public bool PsExecTscan(String Server, String Domain, String User, String Pass)
+        {
+            String Command = "Tscan.exe //Type:ThisMachine";
+            String[] SplitRemoteExecScript =
+                Command.Replace("\\\"", "\"").Replace("\\\\", "\\").Split(" ".ToCharArray(), 2);
+            Command = "PsExec.exe \\\\" + Server + " -u " + Domain + "\\" + User + " -p \"" + Pass + "\" -h -c -d -accepteula -nobanner \""
+                    + SplitRemoteExecScript[0] + "\" \"" + SplitRemoteExecScript[1] + "\"";
+            LocalExec(Server, User, Pass, Command);
+            return true;
         }
         /// <summary>
         /// This compiles a service for remote execution

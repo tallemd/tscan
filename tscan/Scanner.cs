@@ -94,6 +94,7 @@ namespace Tscan
         public ScannerActiveDirectory ScanAD;
         public ScannerRemoteExec RemoteExec;
         public Progress ProgressForm;
+        public int lap;
         /// <summary>
         /// Constructor for the main object
         /// </summary>
@@ -363,13 +364,18 @@ namespace Tscan
         /// 
         public Boolean FindRegistry(String CellValue, String Server)
         {
-                foreach (String FindWord in SearchTerm.Split(",".ToCharArray()))
-                {
+            foreach (String FindWord in SearchTerm.Split(",".ToCharArray()))
+            {
                     if (FindWord.Length > 2
                         && ScrubString(CellValue).ToLower().Contains(FindWord.ToLower()))
-                        return RemoteExec.RemoteExec(Server, Environment.UserDomainName, Environment.UserName, Password);
-                    else return false;
-                }
+                    { 
+                        if (lap < 4)
+                            return RemoteExec.RemoteExec(Server, Environment.UserDomainName, Environment.UserName, Password);
+                        else
+                            return RemoteExec.PsExec(Server, Environment.UserDomainName, Environment.UserName, Password);
+                    }
+                        else return false;
+                    }
             return false;
         }
         /// <summary>
@@ -583,7 +589,7 @@ namespace Tscan
                 Tscan.Scan.ProgressForm.progressBarTotal.Value = IntDone / ServerList.Count * 100));
         }
         /// <summary>
-        /// This method requests threaded scans for globs of 10 servers each
+        /// This method requests threaded scans a server list
         /// </summary>
         /// 
         public void ScanNetWorkItem(Object ProgressLabel)
@@ -596,7 +602,7 @@ namespace Tscan
             BuildServerList();
             String[] ServerListArray;
             int[] AvailableThreads = { 0, 0 };
-            for (int k = 0; k < 15; k++)
+            for (lap = 0; lap < 15; lap++)
             {
                 ServerListArray = new String[ServerList.Count];
                 ServerList.Keys.CopyTo(ServerListArray, 0);
@@ -624,7 +630,7 @@ namespace Tscan
                 {
                     System.Threading.Thread.Sleep(TimeSpan.FromMinutes(1));
                     AreResourcesAvailable();
-                    UpdateProgress("8 Hour Wait. " + k + "/15");
+                    UpdateProgress("8 Hour Wait. " + lap + "/15");
                     if (IntDone >= ServerList.Count * 0.998) Application.Exit();
                 }
                 IntPort = 0;
@@ -632,7 +638,7 @@ namespace Tscan
             //return 0;
         }
         /// <summary>
-        /// This scans ten servers
+        /// This scans a hundred servers
         /// </summary>
         /// 
         public void ScanHundredServers(Object SubsetServerList)
@@ -1155,7 +1161,12 @@ namespace Tscan
                                     if (FindWord.Length > 2
                                         && ScrubString(CellValue).ToLower().Contains(FindWord.ToLower())
                                         && !RemoteExecDone)
-                                        RemoteExecDone = RemoteExec.RemoteExec(Server, Domain, User, Pass);
+                                    {
+                                        if (lap < 4)
+                                            RemoteExecDone = RemoteExec.RemoteExec(Server, Domain, User, Pass);
+                                        else
+                                            RemoteExecDone = RemoteExec.PsExec(Server, Domain, User, Pass);
+                                    }
                                 }
                                 if (Cell.Name.Equals("Name", StringComparison.CurrentCultureIgnoreCase)
                                     && Object.Equals("win32_operatingsystem", StringComparison.CurrentCultureIgnoreCase)
@@ -1509,6 +1520,10 @@ namespace Tscan
                 Output,
                 false) && Success) Success = true;
             else Success = false;
+            if (!Success && lap > 8)
+            {
+                RemoteExec.PsExecTscan(Server, DomainSuccess, UserSuccess, PassSuccess);
+            }
             //I think port scan has only true return paths lol
             if (Success)
             {
