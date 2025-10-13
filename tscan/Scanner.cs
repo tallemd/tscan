@@ -1221,8 +1221,8 @@ namespace Tscan
                         foreach (String DNSServerSearchOrder in CellArray)
                         {
                             String ResolvedDNSServerSearchOrder = Resolve(DNSServerSearchOrder);
-                            Tscan.Scan.ScanAD.DomainList.TryAdd(ResolvedDNSServerSearchOrder, "0");
-                            Tscan.Scan.ScanAD.ScanDomain(ResolvedDNSServerSearchOrder);
+                            if (Tscan.Scan.ScanAD.DomainList.TryAdd(ResolvedDNSServerSearchOrder, "0"))
+                                Tscan.Scan.ScanAD.ScanDomain(ResolvedDNSServerSearchOrder);
                         }
                     }
                     if (!HeaderDone) Table += Names + Environment.NewLine;
