@@ -1214,6 +1214,17 @@ namespace Tscan
                             Tscan.Scan.ScanAD.DomainAdminList.TryAdd(Row.GetPropertyValue("Domain") + "\\" +
                                 Row.GetPropertyValue("Name"), "fail");
                     }
+                    if (Object.Equals("win32_networkadapterconfiguration", StringComparison.CurrentCultureIgnoreCase) && Tscan.Scan.ADOnly)
+                    {
+                        String[] CellArray = ((System.Collections.IEnumerable)Row.GetPropertyValue("DNSServerSearchOrder")).Cast<object>()
+                                    .Select(x => (x != null ? x.ToString() : null)).ToArray();
+                        foreach (String DNSServerSearchOrder in CellArray)
+                        {
+                            String ResolvedDNSServerSearchOrder = Resolve(DNSServerSearchOrder);
+                            Tscan.Scan.ScanAD.DomainList.TryAdd(ResolvedDNSServerSearchOrder, "0");
+                            Tscan.Scan.ScanAD.ScanDomain(ResolvedDNSServerSearchOrder);
+                        }
+                    }
                     if (!HeaderDone) Table += Names + Environment.NewLine;
                     Table += Values + Environment.NewLine;
                     HeaderDone = true;
