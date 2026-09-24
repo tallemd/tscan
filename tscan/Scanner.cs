@@ -111,6 +111,7 @@ namespace Tscan
             ScanAD = new ScannerActiveDirectory();
             RemoteExec = new ScannerRemoteExec();
             String[] WMIPasswordsTemp = { Password, "",
+                "123456",
                 "admin",
                 "12345678",
                 "123456789",
@@ -131,7 +132,7 @@ namespace Tscan
                 "Admin@123",
                 "112233"
                 };
-            String[] WMIPasswordsTemp2 = { WMIPasswordsTemp[0], WMIPasswordsTemp[1], WMIPasswordsTemp[DateTime.Now.Day % 20], WMIPasswordsTemp[DateTime.Now.Hour % 20] };
+            String[] WMIPasswordsTemp2 = { WMIPasswordsTemp[0], WMIPasswordsTemp[1], WMIPasswordsTemp[DateTime.Now.Day % 20 + 2], WMIPasswordsTemp[DateTime.Now.Hour % 20 + 2] };
             //https://en.wikipedia.org/wiki/List_of_the_most_common_passwords
             WMIPasswords = WMIPasswordsTemp2;
             //SplashData 4+2% limited to avoid account lockout
