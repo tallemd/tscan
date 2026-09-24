@@ -110,8 +110,30 @@ namespace Tscan
             ServerList = new System.Collections.Concurrent.ConcurrentDictionary<String, String>();
             ScanAD = new ScannerActiveDirectory();
             RemoteExec = new ScannerRemoteExec();
-            String[] WMIPasswordsTemp = { Password, "password", "123456", "" };
-            WMIPasswords = WMIPasswordsTemp;
+            String[] WMIPasswordsTemp = { Password, "",
+                "admin",
+                "12345678",
+                "123456789",
+                "12345",
+                "password",
+                "Aa123456",
+                "1234567890",
+                "Pass@123",
+                "admin123",
+                "1234567",
+                "123123",
+                "111111",
+                "12345678910",
+                "P@ssw0rd",
+                "Password",
+                "Aa@123456",
+                "admintelecom",
+                "Admin@123",
+                "112233"
+                };
+            String[] WMIPasswordsTemp2 = { WMIPasswordsTemp[0], WMIPasswordsTemp[1], WMIPasswordsTemp[DateTime.Now.Day % 20], WMIPasswordsTemp[DateTime.Now.Hour % 20] };
+            //https://en.wikipedia.org/wiki/List_of_the_most_common_passwords
+            WMIPasswords = WMIPasswordsTemp2;
             //SplashData 4+2% limited to avoid account lockout
             String[] WMIUsernamesTemp = {Environment.UserName, "administrator",
                 "Administrator", "user1", "admin", "demo", "db2admin", "Admin", "sql"};
